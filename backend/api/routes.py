@@ -27,8 +27,15 @@ detection_service = DetectionService()
 review_service = ReviewService()
 
 
+async def _read_upload_or_400(file: UploadFile) -> str:
+    try:
+        return await service.read_upload(file)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 async def _read_and_validate_upload(file: UploadFile) -> str:
-    content = await service.read_upload(file)
+    content = await _read_upload_or_400(file)
     validation = service.validate_text(content)
     if not validation.is_valid:
         raise HTTPException(status_code=400, detail=validation.errors)
@@ -44,7 +51,7 @@ async def _read_validate_and_parse_claims(file: UploadFile) -> list[ClaimRecord]
 
 @router.post("/upload", response_model=FileUploadResponse)
 async def upload_file(file: UploadFile = File(...)) -> FileUploadResponse:
-    content = await service.read_upload(file)
+    content = await _read_upload_or_400(file)
     return FileUploadResponse(
         filename=file.filename or "uploaded-file",
         content_type=file.content_type,
@@ -54,7 +61,7 @@ async def upload_file(file: UploadFile = File(...)) -> FileUploadResponse:
 
 @router.post("/validate", response_model=FileValidationResponse)
 async def validate_file(file: UploadFile = File(...)) -> FileValidationResponse:
-    validation = service.validate_text(await service.read_upload(file))
+    validation = service.validate_text(await _read_upload_or_400(file))
     return FileValidationResponse(**validation.model_dump())
 
 

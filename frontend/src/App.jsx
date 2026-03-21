@@ -1,186 +1,165 @@
 import { useEffect, useState } from "react";
 
-import { dashboardResponse, flagDetails } from "./mockData";
+import AnalyticsPage from "./AnalyticsPage";
+import AuthPage from "./AuthPage";
+import DashboardPage from "./DashboardPage";
+import LandingPage from "./LandingPage";
+import ProductShell from "./ProductShell";
+import { getCurrentUser, isAuthenticated, signIn, signOut, signUp } from "./auth";
 
-const RULE_TYPES = ["All", "ExactClaimDuplicate", "DuplicateServiceLinesWithinClaim", "SameClaimContentDifferentIds"];
-const STATUSES = ["All", "New", "Reviewed", "Resolved", "Ignored"];
-const EMPTY_FLAG_DETAILS = { flag: null, claims: [] };
 
-function buildDashboardQuery(ruleType, status) {
-  const params = new URLSearchParams();
-  if (ruleType !== "All") {
-    params.set("rule_type", ruleType);
-  }
-  if (status !== "All") {
-    params.set("status", status);
-  }
-  const query = params.toString();
-  return query ? `?${query}` : "";
-}
-
-async function fetchDashboard(ruleType, status) {
-  try {
-    const response = await fetch(`/api/files/review/dashboard${buildDashboardQuery(ruleType, status)}`);
-    if (!response.ok) {
-      throw new Error("Dashboard request failed");
-    }
-    return response.json();
-  } catch {
-    return dashboardResponse;
+function navigateTo(path) {
+  if (window.location.pathname !== path) {
+    window.history.pushState({}, "", path);
+    window.dispatchEvent(new PopStateEvent("popstate"));
   }
 }
 
-async function fetchFlagDetails(flagId) {
-  try {
-    const response = await fetch(`/api/files/review/flags/${flagId}`);
-    if (!response.ok) {
-      throw new Error("Flag details request failed");
-    }
-    return response.json();
-  } catch {
-    return flagDetails[flagId] ?? EMPTY_FLAG_DETAILS;
-  }
+function getStoredTheme() {
+  return window.localStorage.getItem("cecurus_theme") ?? "light";
 }
 
-function MetricCard({ label, value }) {
-  return (
-    <article className="metric-card">
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </article>
-  );
-}
-
-function DetailPanel({ details }) {
-  if (!details?.flag) {
-    return (
-      <aside className="detail-panel empty">
-        <h2>Flag Detail</h2>
-        <p>Select a flag to inspect claim-level data stored locally.</p>
-      </aside>
-    );
-  }
+function Header({ currentPath, currentUser, onNavigate }) {
+  const isSignedIn = Boolean(currentUser);
 
   return (
-    <aside className="detail-panel">
-      <h2>{details.flag.flag_id}</h2>
-      <p>{details.flag.explanation}</p>
-      <div className="chip-row">
-        {details.flag.matched_identifiers.map((identifier) => (
-          <span key={identifier} className="chip">
-            {identifier}
-          </span>
-        ))}
-      </div>
-      {details.claims.map((claim) => (
-        <section key={claim.claim_id} className="claim-card">
-          <h3>{claim.claim_id}</h3>
-          <p>Claim Amount: {claim.claim_segment.claim_amount}</p>
-          <p>Billing Provider: {claim.billing_provider.last_name_or_organization}</p>
-          <p>Rendering Provider: {claim.rendering_provider.last_name_or_organization}</p>
-          <ul>
-            {claim.service_lines.map((line) => (
-              <li key={line.raw}>
-                {line.line_type} | {line.service_code} | {line.modifiers.join(", ") || "No modifiers"} | {line.claim_amount}
-              </li>
-            ))}
-          </ul>
-        </section>
-      ))}
-    </aside>
+    <header className="mx-auto flex w-full max-w-[90rem] items-center justify-between gap-4 px-4 py-5 sm:px-6 lg:px-8">
+      <button
+        type="button"
+        className="text-xl font-semibold tracking-[0.2em] text-brand-700 dark:text-brand-300"
+        onClick={() => onNavigate(isSignedIn ? "/dashboard" : "/")}
+      >
+        CECURUS
+      </button>
+      <nav className="flex items-center gap-3">
+        {isSignedIn ? (
+          <button
+            type="button"
+            className={currentPath === "/dashboard" ? "rounded-full bg-brand-50 px-4 py-2 text-sm font-medium text-brand-700 dark:bg-brand-500/10 dark:text-brand-200" : "rounded-full px-4 py-2 text-sm font-medium text-ink-500 dark:text-ink-300"}
+            onClick={() => onNavigate("/dashboard")}
+          >
+            Dashboard
+          </button>
+        ) : (
+          <>
+            <button
+              type="button"
+              className={currentPath === "/signin" ? "rounded-full bg-brand-50 px-4 py-2 text-sm font-medium text-brand-700 dark:bg-brand-500/10 dark:text-brand-200" : "rounded-full px-4 py-2 text-sm font-medium text-ink-500 dark:text-ink-300"}
+              onClick={() => onNavigate("/signin")}
+            >
+              Sign In
+            </button>
+            <button
+              type="button"
+              className="rounded-full bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-400"
+              onClick={() => onNavigate("/signup")}
+            >
+              Sign Up
+            </button>
+          </>
+        )}
+      </nav>
+    </header>
   );
 }
 
 export default function App() {
-  const [dashboard, setDashboard] = useState(dashboardResponse);
-  const [selectedRuleType, setSelectedRuleType] = useState("All");
-  const [selectedStatus, setSelectedStatus] = useState("All");
-  const [selectedFlagId, setSelectedFlagId] = useState("");
-  const [details, setDetails] = useState(EMPTY_FLAG_DETAILS);
+  const [currentPath, setCurrentPath] = useState(window.location.pathname || "/");
+  const [currentUser, setCurrentUser] = useState(getCurrentUser());
+  const [theme, setTheme] = useState(getStoredTheme());
 
   useEffect(() => {
-    fetchDashboard(selectedRuleType, selectedStatus).then(setDashboard);
-  }, [selectedRuleType, selectedStatus]);
+    document.documentElement.classList.toggle("dark", theme === "dark");
+    window.localStorage.setItem("cecurus_theme", theme);
+  }, [theme]);
 
   useEffect(() => {
-    if (!selectedFlagId) {
-      setDetails(EMPTY_FLAG_DETAILS);
+    function handleNavigation() {
+      setCurrentPath(window.location.pathname || "/");
+      setCurrentUser(getCurrentUser());
+    }
+
+    window.addEventListener("popstate", handleNavigation);
+    return () => window.removeEventListener("popstate", handleNavigation);
+  }, []);
+
+  useEffect(() => {
+    if (["/dashboard", "/analytics"].includes(currentPath) && !isAuthenticated()) {
+      navigateTo("/signin");
       return;
     }
-    fetchFlagDetails(selectedFlagId).then(setDetails);
-  }, [selectedFlagId]);
+
+    if (!["/", "/signin", "/signup", "/dashboard", "/analytics"].includes(currentPath)) {
+      navigateTo(isAuthenticated() ? "/dashboard" : "/");
+    }
+  }, [currentPath]);
+
+  async function handleSignIn(formValues) {
+    const user = await signIn(formValues);
+    setCurrentUser(user);
+    navigateTo("/dashboard");
+  }
+
+  async function handleSignUp(formValues) {
+    const user = await signUp(formValues);
+    setCurrentUser(user);
+    navigateTo("/dashboard");
+  }
+
+  function handleSignOut() {
+    signOut();
+    setCurrentUser(null);
+    navigateTo("/");
+  }
+
+  function renderProtectedRoute() {
+    if (!currentUser) {
+      return null;
+    }
+
+    return (
+      <ProductShell
+        currentPath={currentPath}
+        currentUser={currentUser}
+        onNavigate={navigateTo}
+        onSignOut={handleSignOut}
+        theme={theme}
+        onToggleTheme={() => setTheme((current) => (current === "light" ? "dark" : "light"))}
+      >
+        {({ theme: shellTheme, onToggleTheme }) =>
+          currentPath === "/analytics" ? (
+            <AnalyticsPage currentUser={currentUser} theme={shellTheme} onToggleTheme={onToggleTheme} />
+          ) : (
+            <DashboardPage currentUser={currentUser} theme={shellTheme} onToggleTheme={onToggleTheme} />
+          )}
+      </ProductShell>
+    );
+  }
+
+  function renderRoute() {
+    if (currentPath === "/signin") {
+      return <AuthPage mode="signin" onSubmit={handleSignIn} onNavigate={navigateTo} />;
+    }
+
+    if (currentPath === "/signup") {
+      return <AuthPage mode="signup" onSubmit={handleSignUp} onNavigate={navigateTo} />;
+    }
+
+    if (currentPath === "/dashboard" || currentPath === "/analytics") {
+      return renderProtectedRoute();
+    }
+
+    return <LandingPage onNavigate={navigateTo} />;
+  }
+
+  const isProtectedRoute = currentPath === "/dashboard" || currentPath === "/analytics";
 
   return (
-    <main className="app-shell">
-      <section className="hero">
-        <div>
-          <p className="eyebrow">Cecurus</p>
-          <h1>Local Claims Review Dashboard</h1>
-          <p>PHI stays local. Review duplicate flags, rule hits, and workflow state from the MVP parser and detection engine.</p>
-        </div>
-      </section>
-
-      <section className="metrics-grid">
-        <MetricCard label="Total Claims Processed" value={dashboard.metrics.total_claims_processed} />
-        <MetricCard label="Total Flags Created" value={dashboard.metrics.total_flags_created} />
-        <MetricCard label="Rule Types Hit" value={Object.keys(dashboard.metrics.flags_by_rule_type).length} />
-        <MetricCard label="Workflow States Used" value={Object.keys(dashboard.metrics.flags_by_workflow_status).length} />
-      </section>
-
-      <section className="controls">
-        <label>
-          Rule Type
-          <select value={selectedRuleType} onChange={(event) => setSelectedRuleType(event.target.value)}>
-            {RULE_TYPES.map((ruleType) => (
-              <option key={ruleType} value={ruleType}>
-                {ruleType}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Status
-          <select value={selectedStatus} onChange={(event) => setSelectedStatus(event.target.value)}>
-            {STATUSES.map((status) => (
-              <option key={status} value={status}>
-                {status}
-              </option>
-            ))}
-          </select>
-        </label>
-      </section>
-
-      <section className="content-grid">
-        <div className="table-panel">
-          <div className="panel-header">
-            <h2>Flagged Records</h2>
-            <p>Simple local table for review workflow triage.</p>
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th>Flag ID</th>
-                <th>Rule Type</th>
-                <th>Claim IDs</th>
-                <th>Identifiers</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {dashboard.flags.map((flag) => (
-                <tr key={flag.flag_id} onClick={() => setSelectedFlagId(flag.flag_id)}>
-                  <td>{flag.flag_id}</td>
-                  <td>{flag.rule_type}</td>
-                  <td>{flag.claim_ids.join(", ")}</td>
-                  <td>{flag.matched_identifiers.join(", ")}</td>
-                  <td>{flag.status}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <DetailPanel details={details} />
-      </section>
-    </main>
+    <>
+      {!isProtectedRoute ? (
+        <Header currentPath={currentPath} currentUser={currentUser} onNavigate={navigateTo} />
+      ) : null}
+      {renderRoute()}
+    </>
   );
 }

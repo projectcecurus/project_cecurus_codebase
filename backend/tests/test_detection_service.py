@@ -37,8 +37,16 @@ def build_line(raw: str, line_type: str = "SV1", code: str = "99213", amount: st
     return ServiceLine(raw=raw, line_type=line_type, service_code=code, modifiers=["25"], claim_amount=amount)
 
 
-def test_detects_exact_claim_duplicates(tmp_path: Path) -> None:
-    repository = FlagRepository(str(tmp_path / "flags.db"))
+def build_repository(name: str) -> FlagRepository:
+    Path("scratch_verify").mkdir(exist_ok=True)
+    database_path = Path(f"scratch_verify/{name}.db")
+    if database_path.exists():
+        database_path.unlink()
+    return FlagRepository(str(database_path))
+
+
+def test_detects_exact_claim_duplicates() -> None:
+    repository = build_repository("flags_exact")
     service = DetectionService(repository)
     line = build_line("SV1*HC:99213:25*100")
 
@@ -52,8 +60,8 @@ def test_detects_exact_claim_duplicates(tmp_path: Path) -> None:
     assert any(flag.rule_type == RuleType.EXACT_CLAIM_DUPLICATE for flag in flags)
 
 
-def test_detects_duplicate_service_lines_within_claim(tmp_path: Path) -> None:
-    repository = FlagRepository(str(tmp_path / "flags.db"))
+def test_detects_duplicate_service_lines_within_claim() -> None:
+    repository = build_repository("flags_lines")
     service = DetectionService(repository)
     line = build_line("SV1*HC:99213:25*100")
 
@@ -62,8 +70,8 @@ def test_detects_duplicate_service_lines_within_claim(tmp_path: Path) -> None:
     assert any(flag.rule_type == RuleType.DUPLICATE_SERVICE_LINE_WITHIN_CLAIM for flag in flags)
 
 
-def test_detects_same_content_different_claim_ids(tmp_path: Path) -> None:
-    repository = FlagRepository(str(tmp_path / "flags.db"))
+def test_detects_same_content_different_claim_ids() -> None:
+    repository = build_repository("flags_content")
     service = DetectionService(repository)
     line = build_line("SV1*HC:99213:25*100")
 
@@ -77,8 +85,8 @@ def test_detects_same_content_different_claim_ids(tmp_path: Path) -> None:
     assert any(flag.rule_type == RuleType.SAME_CONTENT_DIFFERENT_ID for flag in flags)
 
 
-def test_updates_flag_status_in_repository(tmp_path: Path) -> None:
-    repository = FlagRepository(str(tmp_path / "flags.db"))
+def test_updates_flag_status_in_repository() -> None:
+    repository = build_repository("flags_status")
     service = DetectionService(repository)
     line = build_line("SV1*HC:99213:25*100")
     flags = service.run_detection([build_claim("ABC123", [line, line])])

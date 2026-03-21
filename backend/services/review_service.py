@@ -25,7 +25,7 @@ class ReviewService:
         self.flag_repository = flag_repository or FlagRepository()
 
     def store_claims(self, claims: list[ClaimRecord]) -> None:
-        self.claim_repository.save_claims(claims)
+        self.claim_repository.replace_claims(claims)
 
     def get_dashboard(self, rule_type: RuleType | None = None, status: FlagStatus | None = None) -> ReviewDashboardResponse:
         flags = self._filter_flags(rule_type=rule_type, status=status)

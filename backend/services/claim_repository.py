@@ -42,6 +42,17 @@ class ClaimRepository:
                 [(claim.claim_id, claim.model_dump_json()) for claim in claims],
             )
 
+    def replace_claims(self, claims: list[ClaimRecord]) -> None:
+        with self._connect() as connection:
+            connection.execute("DELETE FROM claims")
+            connection.executemany(
+                """
+                INSERT INTO claims (claim_id, payload)
+                VALUES (?, ?)
+                """,
+                [(claim.claim_id, claim.model_dump_json()) for claim in claims],
+            )
+
     def get_claims_by_claim_id(self, claim_id: str) -> list[ClaimRecord]:
         with self._connect() as connection:
             rows = connection.execute(

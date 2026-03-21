@@ -18,12 +18,21 @@ def make_claim(claim_id: str) -> ClaimRecord:
     )
 
 
-def test_dashboard_metrics_and_flag_details(tmp_path: Path) -> None:
-    db_path = str(tmp_path / "review.db")
+def build_services(database_name: str) -> tuple[ClaimRepository, FlagRepository, ReviewService, DetectionService]:
+    Path("scratch_verify").mkdir(exist_ok=True)
+    database_path = Path(f"scratch_verify/{database_name}.db")
+    if database_path.exists():
+        database_path.unlink()
+    db_path = str(database_path)
     claim_repository = ClaimRepository(db_path)
     flag_repository = FlagRepository(db_path)
     review_service = ReviewService(claim_repository=claim_repository, flag_repository=flag_repository)
     detection_service = DetectionService(flag_repository)
+    return claim_repository, flag_repository, review_service, detection_service
+
+
+def test_dashboard_metrics_and_flag_details() -> None:
+    _, _, review_service, detection_service = build_services("review_metrics")
     claims = [make_claim("A100"), make_claim("B200")]
 
     review_service.store_claims(claims)
@@ -42,12 +51,8 @@ def test_dashboard_metrics_and_flag_details(tmp_path: Path) -> None:
     assert "CLM" in details.flag.matched_identifiers
 
 
-def test_dashboard_filters_by_status(tmp_path: Path) -> None:
-    db_path = str(tmp_path / "review.db")
-    claim_repository = ClaimRepository(db_path)
-    flag_repository = FlagRepository(db_path)
-    review_service = ReviewService(claim_repository=claim_repository, flag_repository=flag_repository)
-    detection_service = DetectionService(flag_repository)
+def test_dashboard_filters_by_status() -> None:
+    _, flag_repository, review_service, detection_service = build_services("review_status")
     review_service.store_claims([make_claim("A100"), make_claim("B200")])
     flags = detection_service.run_detection([make_claim("A100"), make_claim("B200")])
     flag_repository.update_status(flags[0].flag_id, FlagStatus.REVIEWED)
