@@ -4,8 +4,9 @@ import { dashboardResponse, flagDetails } from "./mockData";
 
 const RULE_TYPES = ["All", "ExactClaimDuplicate", "DuplicateServiceLinesWithinClaim", "SameClaimContentDifferentIds"];
 const STATUSES = ["All", "New", "Reviewed", "Resolved", "Ignored"];
+const EMPTY_FLAG_DETAILS = { flag: null, claims: [] };
 
-async function fetchDashboard(ruleType, status) {
+function buildDashboardQuery(ruleType, status) {
   const params = new URLSearchParams();
   if (ruleType !== "All") {
     params.set("rule_type", ruleType);
@@ -13,9 +14,13 @@ async function fetchDashboard(ruleType, status) {
   if (status !== "All") {
     params.set("status", status);
   }
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}
 
+async function fetchDashboard(ruleType, status) {
   try {
-    const response = await fetch(`/api/files/review/dashboard?${params.toString()}`);
+    const response = await fetch(`/api/files/review/dashboard${buildDashboardQuery(ruleType, status)}`);
     if (!response.ok) {
       throw new Error("Dashboard request failed");
     }
@@ -33,7 +38,7 @@ async function fetchFlagDetails(flagId) {
     }
     return response.json();
   } catch {
-    return flagDetails[flagId] ?? { flag: null, claims: [] };
+    return flagDetails[flagId] ?? EMPTY_FLAG_DETAILS;
   }
 }
 
@@ -91,7 +96,7 @@ export default function App() {
   const [selectedRuleType, setSelectedRuleType] = useState("All");
   const [selectedStatus, setSelectedStatus] = useState("All");
   const [selectedFlagId, setSelectedFlagId] = useState("");
-  const [details, setDetails] = useState({ flag: null, claims: [] });
+  const [details, setDetails] = useState(EMPTY_FLAG_DETAILS);
 
   useEffect(() => {
     fetchDashboard(selectedRuleType, selectedStatus).then(setDashboard);
@@ -99,7 +104,7 @@ export default function App() {
 
   useEffect(() => {
     if (!selectedFlagId) {
-      setDetails({ flag: null, claims: [] });
+      setDetails(EMPTY_FLAG_DETAILS);
       return;
     }
     fetchFlagDetails(selectedFlagId).then(setDetails);
