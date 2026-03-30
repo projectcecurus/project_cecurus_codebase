@@ -1,9 +1,6 @@
-from pathlib import Path
-
 from backend.schemas.claims import ClaimRecord, Provider, ServiceLine
-from backend.schemas.detection import FlagStatus, RuleType
+from backend.schemas.detection import RuleType
 from backend.services.detection_service import DetectionService
-from backend.services.flag_repository import FlagRepository
 
 
 def build_claim(
@@ -37,32 +34,17 @@ def build_line(raw: str, line_type: str = "SV1", code: str = "99213", amount: st
     return ServiceLine(raw=raw, line_type=line_type, service_code=code, modifiers=["25"], claim_amount=amount)
 
 
-def build_repository(name: str) -> FlagRepository:
-    Path("scratch_verify").mkdir(exist_ok=True)
-    database_path = Path(f"scratch_verify/{name}.db")
-    if database_path.exists():
-        database_path.unlink()
-    return FlagRepository(str(database_path))
-
-
 def test_detects_exact_claim_duplicates() -> None:
-    repository = build_repository("flags_exact")
-    service = DetectionService(repository)
+    service = DetectionService()
     line = build_line("SV1*HC:99213:25*100")
 
-    flags = service.run_detection(
-        [
-            build_claim("ABC123", [line]),
-            build_claim("ABC123", [line]),
-        ]
-    )
+    flags = service.run_detection([build_claim("ABC123", [line]), build_claim("ABC123", [line])])
 
     assert any(flag.rule_type == RuleType.EXACT_CLAIM_DUPLICATE for flag in flags)
 
 
 def test_detects_duplicate_service_lines_within_claim() -> None:
-    repository = build_repository("flags_lines")
-    service = DetectionService(repository)
+    service = DetectionService()
     line = build_line("SV1*HC:99213:25*100")
 
     flags = service.run_detection([build_claim("ABC123", [line, line])])
@@ -71,27 +53,9 @@ def test_detects_duplicate_service_lines_within_claim() -> None:
 
 
 def test_detects_same_content_different_claim_ids() -> None:
-    repository = build_repository("flags_content")
-    service = DetectionService(repository)
+    service = DetectionService()
     line = build_line("SV1*HC:99213:25*100")
 
-    flags = service.run_detection(
-        [
-            build_claim("ABC123", [line]),
-            build_claim("XYZ789", [line]),
-        ]
-    )
+    flags = service.run_detection([build_claim("ABC123", [line]), build_claim("XYZ789", [line])])
 
     assert any(flag.rule_type == RuleType.SAME_CONTENT_DIFFERENT_ID for flag in flags)
-
-
-def test_updates_flag_status_in_repository() -> None:
-    repository = build_repository("flags_status")
-    service = DetectionService(repository)
-    line = build_line("SV1*HC:99213:25*100")
-    flags = service.run_detection([build_claim("ABC123", [line, line])])
-
-    updated = service.update_flag_status(flags[0].flag_id, FlagStatus.REVIEWED)
-
-    assert updated is not None
-    assert updated.status == FlagStatus.REVIEWED

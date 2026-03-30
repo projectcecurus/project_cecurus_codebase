@@ -2,74 +2,34 @@ from __future__ import annotations
 
 from collections import Counter
 
-from backend.schemas.claims import ClaimRecord
-from backend.schemas.detection import (
-    DashboardMetrics,
-    DetectionFlag,
-    FlagStatus,
-    FlagWithClaims,
-    ReviewDashboardResponse,
-    RuleType,
-)
-from backend.services.claim_repository import ClaimRepository
-from backend.services.flag_repository import FlagRepository
+from backend.schemas.detection import DashboardMetrics, DetectionFlag, FlagStatus, ReviewDashboardResponse, RuleType
+from backend.services.review_session_store import ReviewSessionState
 
 
 class ReviewService:
-    def __init__(
+    def get_dashboard(
         self,
-        claim_repository: ClaimRepository | None = None,
-        flag_repository: FlagRepository | None = None,
-    ) -> None:
-        self.claim_repository = claim_repository or ClaimRepository()
-        self.flag_repository = flag_repository or FlagRepository()
-
-    def store_claims(self, claims: list[ClaimRecord]) -> None:
-        self.claim_repository.replace_claims(claims)
-
-    def get_dashboard(self, rule_type: RuleType | None = None, status: FlagStatus | None = None) -> ReviewDashboardResponse:
-        flags = self._filter_flags(rule_type=rule_type, status=status)
-        metrics = self._build_metrics()
+        session: ReviewSessionState,
+        *,
+        rule_type: RuleType | None = None,
+        status: FlagStatus | None = None,
+    ) -> ReviewDashboardResponse:
+        flags = self._filter_flags(list(session.flags.values()), rule_type=rule_type, status=status)
+        metrics = self._build_metrics(session)
         return ReviewDashboardResponse(metrics=metrics, flags=flags)
 
-    def get_flag_with_claims(self, flag_id: str) -> FlagWithClaims | None:
-        flag = self.flag_repository.get_flag(flag_id)
-        if flag is None:
-            return None
-        claims: list[ClaimRecord] = []
-        for claim_id in flag.claim_ids:
-            claims.extend(self.claim_repository.get_claims_by_claim_id(claim_id))
-        return FlagWithClaims(flag=flag, claims=claims)
-
-    def list_claims(self) -> list[ClaimRecord]:
-        return self.claim_repository.list_claims()
-
-    def _filter_flags(self, rule_type: RuleType | None, status: FlagStatus | None) -> list[DetectionFlag]:
-        flags = self.flag_repository.list_flags()
+    def _filter_flags(self, flags: list[DetectionFlag], rule_type: RuleType | None, status: FlagStatus | None) -> list[DetectionFlag]:
         return [
             flag
             for flag in flags
-            if self._matches_filters(flag, rule_type=rule_type, status=status)
+            if (rule_type is None or flag.rule_type == rule_type) and (status is None or flag.status == status)
         ]
 
-    def _build_metrics(self) -> DashboardMetrics:
-        claims = self.claim_repository.list_claims()
-        flags = self.flag_repository.list_flags()
-        rule_counts = Counter(flag.rule_type.value for flag in flags)
-        status_counts = Counter(flag.status.value for flag in flags)
+    def _build_metrics(self, session: ReviewSessionState) -> DashboardMetrics:
+        flags = list(session.flags.values())
         return DashboardMetrics(
-            total_claims_processed=len(claims),
+            total_claims_processed=len(session.claims),
             total_flags_created=len(flags),
-            flags_by_rule_type=dict(rule_counts),
-            flags_by_workflow_status=dict(status_counts),
-        )
-
-    def _matches_filters(
-        self,
-        flag: DetectionFlag,
-        rule_type: RuleType | None,
-        status: FlagStatus | None,
-    ) -> bool:
-        return (rule_type is None or flag.rule_type == rule_type) and (
-            status is None or flag.status == status
+            flags_by_rule_type=dict(Counter(flag.rule_type.value for flag in flags)),
+            flags_by_workflow_status=dict(Counter(flag.status.value for flag in flags)),
         )

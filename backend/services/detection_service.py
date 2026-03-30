@@ -3,30 +3,16 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 
 from backend.schemas.claims import ClaimRecord, ServiceLine
-from backend.schemas.detection import DetectionFlag, FlagStatus, RuleType
-from backend.services.flag_repository import FlagRepository
+from backend.schemas.detection import DetectionFlag, RuleType
 
 
 class DetectionService:
-    def __init__(self, repository: FlagRepository | None = None) -> None:
-        self.repository = repository or FlagRepository()
-
     def run_detection(self, claims: list[ClaimRecord]) -> list[DetectionFlag]:
         flags: list[DetectionFlag] = []
         flags.extend(self._detect_exact_claim_duplicates(claims))
         flags.extend(self._detect_duplicate_service_lines_within_claim(claims))
         flags.extend(self._detect_same_content_different_ids(claims))
-        self.repository.replace_flags(flags)
         return flags
-
-    def list_flags(self) -> list[DetectionFlag]:
-        return self.repository.list_flags()
-
-    def get_flag(self, flag_id: str) -> DetectionFlag | None:
-        return self.repository.get_flag(flag_id)
-
-    def update_flag_status(self, flag_id: str, status: FlagStatus) -> DetectionFlag | None:
-        return self.repository.update_status(flag_id, status)
 
     def _detect_exact_claim_duplicates(self, claims: list[ClaimRecord]) -> list[DetectionFlag]:
         grouped: dict[tuple[str, str, str, tuple[str, ...]], list[ClaimRecord]] = defaultdict(list)
