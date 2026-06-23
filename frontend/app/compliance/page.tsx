@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 
 import { LegalAcknowledgement } from "@/components/app/legal-acknowledgement";
@@ -12,7 +12,7 @@ import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { api } from "@/lib/api";
 
-export default function CompliancePage() {
+function ComplianceContent() {
   const { settings, refreshUser } = useAuth();
   const searchParams = useSearchParams();
 
@@ -76,5 +76,13 @@ export default function CompliancePage() {
         </Card>
       </div>
     </ProtectedPage>
+  );
+}
+
+export default function CompliancePage() {
+  return (
+    <Suspense fallback={null}>
+      <ComplianceContent />
+    </Suspense>
   );
 }

@@ -208,7 +208,7 @@ export default function DashboardPage() {
               </tbody>
             </table>
           </div>
-          <p className="mt-5 text-center text-sm text-ink-400 dark:text-ink-400">Copyright 2024 | Cecurus. All rights reserved.</p>
+          <p className="mt-5 text-center text-sm text-ink-400 dark:text-ink-400">Copyright 2026 | Cecurus. All rights reserved.</p>
         </Card>
         {activeFlag ? (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-950/55 px-4 py-8">

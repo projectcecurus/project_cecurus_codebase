@@ -41,6 +41,12 @@ router = APIRouter(prefix="/api")
 audit_service = AuditService()
 
 
+def _is_expired(value: datetime) -> bool:
+    if value.tzinfo is None:
+        return value <= datetime.now(timezone.utc).replace(tzinfo=None)
+    return value <= datetime.now(timezone.utc)
+
+
 def _serialize_user(user: User) -> UserSummary:
     return UserSummary.model_validate(
         {
@@ -83,7 +89,8 @@ def _clear_auth_cookies(response: Response) -> None:
 
 @router.post("/auth/login", response_model=UserSummary)
 def login(payload: LoginRequest, response: Response, db: DatabaseSession) -> UserSummary:
-    user = db.scalar(select(User).where(User.email == payload.email.lower()))
+    normalized_email = payload.email.strip().lower()
+    user = db.scalar(select(User).where(User.email == normalized_email))
     if user is None or not user.is_active or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password.")
     user.last_login_at = datetime.now(timezone.utc)
@@ -165,7 +172,7 @@ def accept_invite(payload: InviteAcceptRequest, db: DatabaseSession) -> UserSumm
     invite = db.scalar(
         select(UserInvite).where(UserInvite.token_hash == token_fingerprint(payload.token), UserInvite.status == InviteStatus.PENDING)
     )
-    if invite is None or invite.expires_at <= datetime.now(timezone.utc):
+    if invite is None or _is_expired(invite.expires_at):
         raise HTTPException(status_code=400, detail="Invite is invalid or expired.")
     if db.scalar(select(User).where(User.email == invite.email)):
         raise HTTPException(status_code=409, detail="A user with this email already exists.")
@@ -194,7 +201,8 @@ def accept_invite(payload: InviteAcceptRequest, db: DatabaseSession) -> UserSumm
 
 @router.post("/auth/password-reset/request", response_model=PasswordResetTokenResponse)
 def request_password_reset(payload: PasswordResetRequest, db: DatabaseSession) -> PasswordResetTokenResponse:
-    user = db.scalar(select(User).where(User.email == payload.email.lower()))
+    normalized_email = payload.email.strip().lower()
+    user = db.scalar(select(User).where(User.email == normalized_email))
     if user is None:
         return PasswordResetTokenResponse(message="If the account exists, a reset token has been generated.", reset_token="")
     raw_token, hashed_token = generate_one_time_token()
@@ -217,7 +225,7 @@ def confirm_password_reset(payload: PasswordResetConfirmRequest, db: DatabaseSes
             PasswordResetToken.used_at.is_(None),
         )
     )
-    if reset_token is None or reset_token.expires_at <= datetime.now(timezone.utc):
+    if reset_token is None or _is_expired(reset_token.expires_at):
         raise HTTPException(status_code=400, detail="Reset token is invalid or expired.")
     user = db.get(User, reset_token.user_id)
     if user is None:

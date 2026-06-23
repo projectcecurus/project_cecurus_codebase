@@ -1,11 +1,13 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { ApiError } from "@/lib/types";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -36,21 +38,25 @@ export default function OnboardingPage() {
     setError("");
     try {
       await api.registerOrganization({
-        organization_name: form.organization_name,
+        organization_name: form.organization_name.trim(),
         facility_type: form.facility_type,
-        facility_address: form.facility_address,
-        city: form.city,
-        state: form.state,
-        zipcode: form.zipcode,
-        primary_email: form.primary_email,
-        primary_phone: form.primary_phone,
-        admin_full_name: form.admin_full_name,
+        facility_address: form.facility_address.trim(),
+        city: form.city.trim(),
+        state: form.state.trim(),
+        zipcode: form.zipcode.trim(),
+        primary_email: form.primary_email.trim(),
+        primary_phone: form.primary_phone.trim(),
+        admin_full_name: form.admin_full_name.trim(),
         admin_password: form.admin_password,
-        contacts: [{ full_name: form.admin_full_name, title: form.contact_title, email: form.primary_email, phone: form.primary_phone, is_primary: true }],
+        contacts: [{ full_name: form.admin_full_name.trim(), title: form.contact_title.trim(), email: form.primary_email.trim(), phone: form.primary_phone.trim(), is_primary: true }],
       });
       router.push("/dashboard");
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Unable to register organization.");
+      if (submitError instanceof ApiError && submitError.status === 409) {
+        setError(`${submitError.message} Sign in instead, or reset the existing account password.`);
+      } else {
+        setError(submitError instanceof Error ? submitError.message : "Unable to register organization.");
+      }
     } finally {
       setLoading(false);
     }
@@ -95,7 +101,19 @@ export default function OnboardingPage() {
               <span className="text-sm font-medium text-ink-700 dark:text-ink-200">Primary contact title</span>
               <input value={form.contact_title} onChange={(event) => setForm((current) => ({ ...current, contact_title: event.target.value }))} />
             </label>
-            {error ? <p className="md:col-span-2 text-sm text-red-500">{error}</p> : null}
+            {error ? (
+              <div className="md:col-span-2 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-200">
+                <p>{error}</p>
+                <div className="mt-3 flex flex-wrap gap-3">
+                  <Link href="/login" className="font-semibold underline underline-offset-4">
+                    Go to sign in
+                  </Link>
+                  <Link href="/forgot-password" className="font-semibold underline underline-offset-4">
+                    Reset password
+                  </Link>
+                </div>
+              </div>
+            ) : null}
             <div className="md:col-span-2 flex justify-end">
               <Button disabled={loading}>{loading ? "Creating organization..." : "Create organization"}</Button>
             </div>

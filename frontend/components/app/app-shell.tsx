@@ -42,9 +42,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Button variant="secondary" onClick={() => signOut()}>
                 Logout
               </Button>
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-b from-brand-200 to-brand-500 text-sm font-semibold text-ink-950">
-                {user.full_name.charAt(0).toUpperCase()}
-              </div>
+              {user.role === "Admin" ? (
+                <Link
+                  href="/users"
+                  aria-label="Go to Manage Users"
+                  className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-b from-brand-200 to-brand-500 text-sm font-semibold text-ink-950 transition hover:scale-[1.03]"
+                >
+                  {user.full_name.charAt(0).toUpperCase()}
+                </Link>
+              ) : (
+                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-b from-brand-200 to-brand-500 text-sm font-semibold text-ink-950">
+                  {user.full_name.charAt(0).toUpperCase()}
+                </div>
+              )}
             </div>
           </div>
           {children}

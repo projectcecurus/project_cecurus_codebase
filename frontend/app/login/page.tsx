@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, Suspense, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Logo } from "@/components/ui/logo";
 
-export default function LoginPage() {
+function LoginContent() {
   const { signIn } = useAuth();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
@@ -22,7 +22,7 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
     try {
-      await signIn(email, password);
+      await signIn(email.trim(), password);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Unable to sign in.");
     } finally {
@@ -67,5 +67,13 @@ export default function LoginPage() {
         </div>
       </Card>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginContent />
+    </Suspense>
   );
 }

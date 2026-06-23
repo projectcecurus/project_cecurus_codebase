@@ -102,9 +102,11 @@ def _settings_for_org(db, organization_id: str) -> OrganizationSettings:
 
 @router.post("/onboarding/register", response_model=OrganizationResponse, status_code=status.HTTP_201_CREATED)
 def register_organization(payload: OrganizationOnboardingRequest, response: Response, db: DatabaseSession) -> OrganizationResponse:
+    organization_name = payload.organization_name.strip()
+    normalized_email = payload.primary_email.strip().lower()
     if db.scalar(select(Organization).where(Organization.name == payload.organization_name.strip())):
         raise HTTPException(status_code=409, detail="Organization already exists.")
-    if db.scalar(select(User).where(User.email == payload.primary_email.lower())):
+    if db.scalar(select(User).where(User.email == normalized_email)):
         raise HTTPException(status_code=409, detail="A user with that email already exists.")
     try:
         admin_password_hash = hash_password(payload.admin_password)
@@ -112,14 +114,14 @@ def register_organization(payload: OrganizationOnboardingRequest, response: Resp
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     org = Organization(
-        name=payload.organization_name.strip(),
-        legal_name=(payload.legal_name or payload.organization_name).strip(),
+        name=organization_name,
+        legal_name=(payload.legal_name or organization_name).strip(),
         facility_type=payload.facility_type.strip(),
         facility_address=payload.facility_address.strip(),
         city=payload.city.strip(),
         state=payload.state.strip(),
         zipcode=payload.zipcode.strip(),
-        primary_email=payload.primary_email.lower(),
+        primary_email=normalized_email,
         primary_phone=payload.primary_phone,
         timezone=payload.timezone,
     )
@@ -128,12 +130,21 @@ def register_organization(payload: OrganizationOnboardingRequest, response: Resp
     for facility in payload.facility_identifiers:
         db.add(FacilityIdentifier(organization_id=org.id, identifier_type=facility.identifier_type, identifier_value=facility.identifier_value, description=facility.description))
     for contact in payload.contacts:
-        db.add(OrganizationContact(organization_id=org.id, full_name=contact.full_name, title=contact.title, email=contact.email.lower(), phone=contact.phone, is_primary=contact.is_primary))
-    db.add(OrganizationSettings(organization_id=org.id, compliance_contact_email=payload.primary_email.lower(), session_timeout_minutes=settings.session_idle_minutes))
+        db.add(
+            OrganizationContact(
+                organization_id=org.id,
+                full_name=contact.full_name,
+                title=contact.title,
+                email=contact.email.strip().lower(),
+                phone=contact.phone,
+                is_primary=contact.is_primary,
+            )
+        )
+    db.add(OrganizationSettings(organization_id=org.id, compliance_contact_email=normalized_email, session_timeout_minutes=settings.session_idle_minutes))
     admin = User(
         organization_id=org.id,
         full_name=payload.admin_full_name.strip(),
-        email=payload.primary_email.lower(),
+        email=normalized_email,
         password_hash=admin_password_hash,
         role=UserRole.ADMIN,
         is_active=True,

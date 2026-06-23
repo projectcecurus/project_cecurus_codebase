@@ -1,14 +1,24 @@
+import Image from "next/image";
+import Link from "next/link";
+
 export function Logo({ compact = false, inverse = false }: { compact?: boolean; inverse?: boolean }) {
   return (
-    <div className="flex items-center gap-3">
+    <Link href="/" aria-label="Go to landing page" className="flex items-center gap-3">
       <div
-        className={`flex h-11 w-11 items-center justify-center rounded-2xl ${
+        className={`flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl ${
           inverse
-            ? "border border-white/15 bg-white/5 text-white ring-1 ring-white/5"
-            : "border border-brand-200/60 bg-brand-50 text-brand-700 ring-1 ring-brand-100"
+            ? "border border-white/15 bg-white ring-1 ring-white/5"
+            : "border border-brand-200/60 bg-white ring-1 ring-brand-100"
         }`}
       >
-        <span className={`text-lg font-semibold ${inverse ? "text-brand-200" : "text-brand-700"}`}>C</span>
+        <Image
+          src="/assets/cecurus-logo.png"
+          alt="Cecurus logo"
+          width={44}
+          height={44}
+          className="h-full w-full object-cover"
+          priority
+        />
       </div>
       {!compact ? (
         <div>
@@ -16,6 +26,6 @@ export function Logo({ compact = false, inverse = false }: { compact?: boolean; 
           <p className={`text-lg font-semibold tracking-[0.16em] ${inverse ? "text-white" : "text-ink-950 dark:text-white"}`}>CECURUS</p>
         </div>
       ) : null}
-    </div>
+    </Link>
   );
 }

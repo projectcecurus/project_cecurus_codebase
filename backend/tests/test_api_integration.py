@@ -57,3 +57,53 @@ def test_zero_storage_review_flow() -> None:
     audit_logs = client.get("/api/audit-logs")
     assert audit_logs.status_code == 200
     assert all("claim_id" not in str(row).lower() for row in audit_logs.json())
+
+
+def test_auth_login_and_password_reset_flow() -> None:
+    client = TestClient(app)
+    suffix = uuid4().hex[:8]
+    email = f"admin-{suffix}@example.com"
+    password = "SecurePass123!"
+    new_password = "ResetPass123!"
+
+    onboarding = client.post(
+        "/api/onboarding/register",
+        json={
+            "organization_name": f"Cecurus Auth {suffix}",
+            "facility_type": "Hospital",
+            "facility_address": "123 Integrity Way",
+            "city": "Atlanta",
+            "state": "GA",
+            "zipcode": "30303",
+            "primary_email": email,
+            "primary_phone": "555-0100",
+            "admin_full_name": "Admin User",
+            "admin_password": password,
+            "contacts": [{"full_name": "Admin User", "title": "Compliance Lead", "email": email, "phone": "555-0100", "is_primary": True}],
+        },
+    )
+    assert onboarding.status_code == 201
+
+    logout = client.post("/api/auth/logout")
+    assert logout.status_code == 200
+
+    login = client.post("/api/auth/login", json={"email": f"  {email.upper()}  ", "password": password})
+    assert login.status_code == 200
+    assert login.json()["email"] == email
+
+    reset_request = client.post("/api/auth/password-reset/request", json={"email": f"  {email}  "})
+    assert reset_request.status_code == 200
+    reset_token = reset_request.json()["reset_token"]
+    assert reset_token
+
+    reset_confirm = client.post("/api/auth/password-reset/confirm", json={"token": reset_token, "new_password": new_password})
+    assert reset_confirm.status_code == 200
+
+    stale_session = client.post("/api/auth/logout")
+    assert stale_session.status_code == 401
+
+    old_login = client.post("/api/auth/login", json={"email": email, "password": password})
+    assert old_login.status_code == 401
+
+    new_login = client.post("/api/auth/login", json={"email": email, "password": new_password})
+    assert new_login.status_code == 200

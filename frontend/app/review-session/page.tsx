@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { ProtectedPage } from "@/components/app/protected-page";
@@ -19,7 +19,7 @@ type SessionNoteState = {
 
 const statusOptions: ReviewFlag["status"][] = ["New", "Reviewed", "Resolved", "Ignored"];
 
-export default function ReviewSessionPage() {
+function ReviewSessionContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session") ?? "";
@@ -201,5 +201,13 @@ export default function ReviewSessionPage() {
         ) : null}
       </div>
     </ProtectedPage>
+  );
+}
+
+export default function ReviewSessionPage() {
+  return (
+    <Suspense fallback={null}>
+      <ReviewSessionContent />
+    </Suspense>
   );
 }

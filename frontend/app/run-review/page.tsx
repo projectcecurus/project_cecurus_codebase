@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { ProtectedPage } from "@/components/app/protected-page";
@@ -9,7 +9,7 @@ import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { api } from "@/lib/api";
 
-export default function RunReviewPage() {
+function RunReviewContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -79,5 +79,13 @@ export default function RunReviewPage() {
         </Card>
       </div>
     </ProtectedPage>
+  );
+}
+
+export default function RunReviewPage() {
+  return (
+    <Suspense fallback={null}>
+      <RunReviewContent />
+    </Suspense>
   );
 }
